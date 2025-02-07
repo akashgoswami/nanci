@@ -1,20 +1,52 @@
 /**
- * Neural Network Implementation for MNIST Digit Recognition
- * 
- * Architecture:
- * - Input Layer: 784 neurons (28x28 pixel images)
+ * Advanced Neural Network Implementation for MNIST Digit Recognition
+ * We will implement an advanced neural network with MNIST handwritten digits dataset.
+ * The network will train on image samples and would guess the digit in the image.
+ * The input image is 28x28 pixels and flattened to 784x1 vector.
+ * The output is a 10x1 vector with the probability of the digit being one of the 10 digits.
+
+* Architecture:
+ * - Input Layer: 784 neurons (28x28 pixel images) normalized to [0,1]
  * - Hidden Layer: 512 neurons with sigmoid activation
  * - Output Layer: 10 neurons (one per digit) with sigmoid activation
  * 
  * Features:
  * - Mini-batch Stochastic Gradient Descent (SGD)
  * - Cross-entropy loss function
- * - Xavier/Glorot weight initialization
+ * - Xavier/Glorot weight initialization instead of random initialization
  * - Bias terms for both layers
  * - Learning rate decay
  * - Weight saving and loading capabilities
- */
+ * 
+ * A python script is used to generate the MNIST dataset and save it to binary files.
+ * The MNIST dataset is a collection of 28x28 pixel images of handwritten digits.
+ * The dataset is split into training and test sets.
+ * The training set is used to train the network and the test set is used to evaluate the network.
+  
+    Input             Hidden        Output
+                                        
+    +-----+                                
+    |     |                                
+    |     |            +----+              
+    |     |            |    |              
+    |     |            |    |              
+    |     |            |    |          +---+
+    |     |            |    |          |   | 
+    |     |            |    |          |   |
+    | 784 |     x      | 512|    x     | 10|
+    |     |            |    |          |   |
+    |     |            |    |          +---+
+    |     |            |    |              
+    |     |            |    |              
+    |     |            |    |              
+    |     |            +----+              
+    |     |                                
+    |     |                                
+    +-----+                                
+*/
+ 
 
+// 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -36,28 +68,60 @@
 #define OUTPUT_BIAS_FILE "output_bias.bin"
 
 // Training data
+// Large array containing training images of 784 features (28x28 pixels)
 float training_images[NUM_TRAINING_IMAGES][INPUT_SIZE];
+
+// Large array containing training labels of 10 digits (0-9)
+// Each label is an integer between 0 and 9
 int training_labels[NUM_TRAINING_IMAGES];
+
+// Large array containing test images of 784 features (28x28 pixels)
 float test_images[NUM_TEST_IMAGES][INPUT_SIZE];
+
+// Large array containing test labels of 10 digits (0-9)
+// Each label is an integer between 0 and 9
 int test_labels[NUM_TEST_IMAGES];
 
 // Network parameters (weights and biases)
-float hidden_weights[HIDDEN_SIZE][INPUT_SIZE];  // Weights between input and hidden layer
-float hidden_bias[HIDDEN_SIZE];                 // Bias terms for hidden layer
-float output_weights[OUTPUT_SIZE][HIDDEN_SIZE]; // Weights between hidden and output layer
-float output_bias[OUTPUT_SIZE];                 // Bias terms for output layer
+
+// Weights between input and hidden layer. The goal of the training is to find the weights that will give the best prediction.
+// We also save and restore the weights from files so with each training we could improve the model.
+float hidden_weights[HIDDEN_SIZE][INPUT_SIZE];  
+
+// Bias terms for hidden layer. The goal of the training is to find the bias that will give the best prediction.
+float hidden_bias[HIDDEN_SIZE];                
+
+// Weights between hidden and output layer. The goal of the training is to find the weights that will give the best prediction.
+// We also save and restore the weights from files so with each training we could improve the model.
+float output_weights[OUTPUT_SIZE][HIDDEN_SIZE]; 
+
+// Bias terms for output layer. The goal of the training is to find the bias that will give the best prediction.
+// We also save and restore the bias from files so with each training we could improve the model.
+float output_bias[OUTPUT_SIZE];                
 
 // Gradient storage for backpropagation
+// The gradients are calculated during the backward pass and used to update the weights and biases.
+// Each gradient corresponds to a weight or bias. 
+
+// Important to note that the gradients are calculated for each batch and then accumulated.
+// This is done to improve the stability of the training process and to prevent overfitting.
+// If we calculate gradient (aka backpropagation) for each image, the model will be too slow and will try to overfit.
+// Instead we calculate the gradient for a batch of images and then update the weights and biases.
+// This way the model will be more stable and will not overfit.
+
 float hidden_weights_grad[HIDDEN_SIZE][INPUT_SIZE];
 float hidden_bias_grad[HIDDEN_SIZE];
 float output_weights_grad[OUTPUT_SIZE][HIDDEN_SIZE];
 float output_bias_grad[OUTPUT_SIZE];
 
 // Mini-batch gradient accumulation
+// This is the same as the gradients but accumulated for each batch of 32 forward passes.
 float hidden_weights_batch_grad[HIDDEN_SIZE][INPUT_SIZE];
 float hidden_bias_batch_grad[HIDDEN_SIZE];
 float output_weights_batch_grad[OUTPUT_SIZE][HIDDEN_SIZE];
 float output_bias_batch_grad[OUTPUT_SIZE];
+
+
 
 /**
  * Sigmoid activation function with numerical stability bounds
@@ -70,8 +134,8 @@ float sigmoid(float x) {
 }
 
 /**
- * Initialize network weights using Xavier/Glorot initialization
- * This helps prevent vanishing/exploding gradients by keeping
+ * Initialize network weights using Xavier/Glorot initialization. We could also use random initialization, 
+ * but Xavier/Glorot initialization helps prevent vanishing/exploding gradients by keeping
  * the variance of activations roughly constant across layers
  */
 void init_weights() {
@@ -102,7 +166,8 @@ void init_weights() {
 }
 
 /**
- * Reset gradient accumulators for new mini-batch
+ * Reset gradient accumulators for new mini-batch. Resetting is required to prevent the gradients from accumulating.
+ * In each batch, gradient changes as weight changed due to previous batch.
  */
 void clear_batch_gradients() {
     for (int i = 0; i < HIDDEN_SIZE; i++) {
@@ -117,7 +182,7 @@ void clear_batch_gradients() {
 }
 
 /**
- * Forward pass through the network
+ * Forward pass through the network. This is easiest part of the network. We just multiply the input by the weights and add the bias.
  * Computes activations for hidden and output layers
  */
 void forward_pass(const float input[INPUT_SIZE], float hidden[HIDDEN_SIZE], float output[OUTPUT_SIZE]) {
@@ -141,46 +206,73 @@ void forward_pass(const float input[INPUT_SIZE], float hidden[HIDDEN_SIZE], floa
 }
 
 /**
- * Backward pass through the network
- * Computes gradients for weights and biases
+ * Backward pass through the network. This is the most critical part of the network. 
+ * We need to calculate the gradients for the weights and biases.
+ * This is done by calculating the error (difference between the predicted output and the target output) and then propagating the error back through the network.
+
+ * Surprisingly, calculating the gradient for a neuron is as simple as multiplying the error by the input.
+ * for a sigmoid activation function, the gradient is the derivative of the sigmoid function, which is sigmoid(x) * (1 - sigmoid(x)).
+ * so a neuron's gradient is the error multiplied by the input and the derivative of the sigmoid function.
+
+ * The distributed error is then used to calculate gradients which are used to update the weights and biases.
  */
 void backward_pass(const float input[INPUT_SIZE], const float hidden[HIDDEN_SIZE], 
                   const float output[OUTPUT_SIZE], const float target[OUTPUT_SIZE]) {
+    
+    // YOU MAY BE SURPRISED about why do we need input layer values here. 
+
+    // The first step is to calculate the error (difference between the predicted output and the target output).
+    // This is simple, we just subtract the target from the output for each output neuron.
+
     // Compute output layer error (cross-entropy derivative with respect to output)
-    float output_delta[OUTPUT_SIZE];
+
+    float output_error[OUTPUT_SIZE];
     for (int i = 0; i < OUTPUT_SIZE; i++) {
-        output_delta[i] = output[i] - target[i];  // Simplified form for sigmoid + cross-entropy
+        output_error[i] = output[i] - target[i];  
     }
     
+    // Now we have a list of errors for each output neuron.
+
+    // This step is to distribute the error from the output layer to the hidden layer.
+    // This is done by multiplying the error by the weights between the hidden and output layer.
+    // This way we get the error for each hidden neuron.
+
     // Compute hidden layer error (backpropagated from output layer)
-    float hidden_delta[HIDDEN_SIZE];
-    for (int i = 0; i < HIDDEN_SIZE; i++) {
-        hidden_delta[i] = 0;
-        // Sum up error contributions from each output neuron
+    float hidden_error[HIDDEN_SIZE];
+    for (int i = 0; i < HIDDEN_SIZE; i++) {  // for every neuron in the hidden layer
+        hidden_error[i] = 0;
+        // Sum up error contributions from each output neuron multiplied by the weight between the hidden and output neuron.
         for (int j = 0; j < OUTPUT_SIZE; j++) {
-            hidden_delta[i] += output_delta[j] * output_weights[j][i];
+            hidden_error[i] += output_error[j] * output_weights[j][i];
         }
-        // Multiply by derivative of sigmoid
-        hidden_delta[i] *= hidden[i] * (1 - hidden[i]);
+        // Multiply by derivative of sigmoid activation function.
+        hidden_error[i] *= hidden[i] * (1 - hidden[i]);
     }
-    
-    // Compute gradients for output layer
+    //  What do we have here? We have a list of distributed errors for each hidden neuron.
+    // We aren't yet into gradient calculation, we just distributed the error from the output layer to the hidden layer.
+
+    // Now we are ready to calculate the gradients.
+    // Compute gradients for output layer weights and bias.
+
+    // for output weight gradient we need to multiply the output_error by the hidden layer inputs.
     for (int i = 0; i < OUTPUT_SIZE; i++) {
         for (int j = 0; j < HIDDEN_SIZE; j++) {
-            output_weights_grad[i][j] = output_delta[i] * hidden[j];
+            output_weights_grad[i][j] = output_error[i] * hidden[j];
         }
-        output_bias_grad[i] = output_delta[i];
+        // for output bias gradient we need to multiply the output_error by 1.
+        output_bias_grad[i] = output_error[i];
     }
     
-    // Compute gradients for hidden layer
+    // Now we are ready to calculate the gradients for the hidden layer.
+    // Compute gradients for hidden layer weights and bias.
     for (int i = 0; i < HIDDEN_SIZE; i++) {
         for (int j = 0; j < INPUT_SIZE; j++) {
-            hidden_weights_grad[i][j] = hidden_delta[i] * input[j];
+            hidden_weights_grad[i][j] = hidden_error[i] * input[j];
         }
-        hidden_bias_grad[i] = hidden_delta[i];
+        hidden_bias_grad[i] = hidden_error[i];
     }
     
-    // Accumulate gradients for mini-batch
+    // Accumulate calculated gradients into the mini-batch accumulator
     for (int i = 0; i < OUTPUT_SIZE; i++) {
         for (int j = 0; j < HIDDEN_SIZE; j++) {
             output_weights_batch_grad[i][j] += output_weights_grad[i][j];
@@ -289,7 +381,8 @@ const int load_mnist_images(const char *filename, float images[][INPUT_SIZE], in
 }
 
 /**
- * Load MNIST label data
+ * Load MNIST label data. This is specially prepared label with no header.
+ * Each label is an integer between 0 and 9.
  */
 const int load_mnist_labels(const char *filename, int labels[], int num_labels) {
     FILE *fp = fopen(filename, "rb");
@@ -342,7 +435,7 @@ void save_weights() {
 }
 
 /**
- * Load network parameters from files
+ * Load network parameters from files if found, otherwise initialize new weights
  */
 int load_weights() {
     FILE *fp;
@@ -399,12 +492,15 @@ float evaluate(const float test_images[][INPUT_SIZE], const int test_labels[], i
 
 /**
  * Calculate cross-entropy loss for a batch
+ * This is a loss function that measures the performance of the network.
+ * The loss is the sum of the negative log-likelihood of the predicted output and the target output.
  */
 float calculate_loss(const float output[OUTPUT_SIZE], const float target[OUTPUT_SIZE]) {
     float loss = 0;
     for (int i = 0; i < OUTPUT_SIZE; i++) {
         // Clip output to avoid log(0)
         float clipped_output = fmax(fmin(output[i], 0.9999f), 0.0001f);
+        // Calculate the loss for each neuron.
         loss -= target[i] * log(clipped_output) + (1 - target[i]) * log(1 - clipped_output);
     }
     return loss;
@@ -435,6 +531,9 @@ int main() {
     if (load_weights() != 0) {
         printf("Initializing new weights...\n");
         init_weights();
+    }
+    else {
+        printf("!!! Continuing with pre-trained weights...\n");
     }
     
     // Training parameters
@@ -480,7 +579,7 @@ int main() {
                     batch_correct++;
                 }
                 
-                // Backward pass
+                // Backward pass: We take the error from the output layer and propagate it back through the network.
                 backward_pass(training_images[i + j], hidden_layer, output_layer, target);
             }
             
@@ -513,7 +612,8 @@ int main() {
         printf("Training Accuracy: %.2f%%\n", train_accuracy);
         printf("Test Accuracy: %.2f%%\n", test_accuracy);
         
-        // Save best model
+        // Save best model if the test accuracy is better than the previous best accuracy.
+        // for the very first epoch, it would always be the best as best_accuracy is initialized to 0.
         if (test_accuracy > best_accuracy) {
             best_accuracy = test_accuracy;
             save_weights();

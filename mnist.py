@@ -6,19 +6,19 @@ def save_mnist_binary():
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
     
     # Save training images
-    with open('mnist_train_images.bin', 'wb') as f:
+    with open('./mnist/mnist_train_images.bin', 'wb') as f:
         f.write(x_train.astype(np.uint8).tobytes())
     
     # Save training labels
-    with open('mnist_train_labels.bin', 'wb') as f:
+    with open('./mnist/mnist_train_labels.bin', 'wb') as f:
         f.write(y_train.astype(np.uint8).tobytes())
     
     # Save test images
-    with open('mnist_test_images.bin', 'wb') as f:
+    with open('./mnist/mnist_test_images.bin', 'wb') as f:
         f.write(x_test.astype(np.uint8).tobytes())
     
     # Save test labels
-    with open('mnist_test_labels.bin', 'wb') as f:
+    with open('./mnist/mnist_test_labels.bin', 'wb') as f:
         f.write(y_test.astype(np.uint8).tobytes())
     
     # Print dataset information
