@@ -1,10 +1,13 @@
 import numpy as np
 from tensorflow.keras.datasets import mnist
+import os
 
 def save_mnist_binary():
     # Download MNIST dataset
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
     
+    os.makedirs('./mnist', exist_ok=True)
+
     # Save training images
     with open('./mnist/mnist_train_images.bin', 'wb') as f:
         f.write(x_train.astype(np.uint8).tobytes())
