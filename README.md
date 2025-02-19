@@ -19,11 +19,15 @@ simple.c explains a basic NN implementation where the network learns the model w
 
 ## Advanced
 
+In this tutorial we will attempt to recognize MNIST database of handwritten digits by training a local NN in C. 
+
 [Overview](https://raw.githubusercontent.com/akashgoswami/nanci/refs/heads/main/nn-flow-diagram-clear.svg)
 
 ```
 pip3 install tensorflow numpy
+#downnload dataset
 python3 mnist.py
+
 gcc -o advance advance.c
 ./advance
 
